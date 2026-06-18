@@ -1,7 +1,7 @@
 import type { AuthOptions } from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
-import { readUsers } from "./users";
+import { findUserByEmail } from "./users";
 
 export const authOptions: AuthOptions = {
   providers: [
@@ -13,8 +13,7 @@ export const authOptions: AuthOptions = {
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) return null;
-        const users = await readUsers();
-        const user = users.find((u) => u.email === credentials.email);
+        const user = await findUserByEmail(credentials.email);
         if (!user) return null;
         const valid = await bcrypt.compare(credentials.password, user.password);
         if (!valid) return null;

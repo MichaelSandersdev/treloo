@@ -1,5 +1,4 @@
-import fs from "fs/promises";
-import path from "path";
+import { sql, ensureSchema } from "./db";
 
 export interface Message {
   id: string;
@@ -10,23 +9,37 @@ export interface Message {
   createdAt: string;
 }
 
-const DATA_DIR = path.join(process.cwd(), "data");
-const MESSAGES_FILE = path.join(DATA_DIR, "messages.json");
-const MAX_MESSAGES = 200;
+function rowToMessage(r: Record<string, string>): Message {
+  return {
+    id: r.id,
+    userEmail: r.user_email,
+    userName: r.user_name,
+    userInitials: r.user_initials,
+    text: r.text,
+    createdAt: r.created_at,
+  };
+}
 
 export async function readMessages(): Promise<Message[]> {
-  try {
-    await fs.mkdir(DATA_DIR, { recursive: true });
-    const content = await fs.readFile(MESSAGES_FILE, "utf-8");
-    return JSON.parse(content);
-  } catch {
-    return [];
-  }
+  await ensureSchema();
+  const rows = await sql`
+    SELECT * FROM messages ORDER BY created_at ASC LIMIT 50
+  `;
+  return (rows as Record<string, string>[]).map(rowToMessage);
+}
+
+export async function readMessagesSince(since: string): Promise<Message[]> {
+  await ensureSchema();
+  const rows = await sql`
+    SELECT * FROM messages WHERE created_at > ${since} ORDER BY created_at ASC
+  `;
+  return (rows as Record<string, string>[]).map(rowToMessage);
 }
 
 export async function appendMessage(message: Message): Promise<void> {
-  const messages = await readMessages();
-  const trimmed = [...messages, message].slice(-MAX_MESSAGES);
-  await fs.mkdir(DATA_DIR, { recursive: true });
-  await fs.writeFile(MESSAGES_FILE, JSON.stringify(trimmed, null, 2));
+  await ensureSchema();
+  await sql`
+    INSERT INTO messages (id, user_email, user_name, user_initials, text, created_at)
+    VALUES (${message.id}, ${message.userEmail}, ${message.userName}, ${message.userInitials}, ${message.text}, ${message.createdAt})
+  `;
 }

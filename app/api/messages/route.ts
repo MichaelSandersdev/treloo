@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/lib/auth";
-import { readMessages, appendMessage } from "@/app/lib/messages";
+import { readMessages, readMessagesSince, appendMessage } from "@/app/lib/messages";
 
 export async function GET(req: Request) {
   const session = await getServerSession(authOptions);
@@ -10,10 +10,8 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const since = searchParams.get("since");
 
-  const messages = await readMessages();
-  const result = since ? messages.filter((m) => m.createdAt > since) : messages.slice(-50);
-
-  return NextResponse.json(result);
+  const messages = since ? await readMessagesSince(since) : await readMessages();
+  return NextResponse.json(messages);
 }
 
 export async function POST(req: Request) {

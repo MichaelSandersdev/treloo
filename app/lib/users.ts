@@ -1,5 +1,4 @@
-import fs from "fs/promises";
-import path from "path";
+import { sql, ensureSchema } from "./db";
 
 export interface StoredUser {
   id: string;
@@ -9,20 +8,20 @@ export interface StoredUser {
   createdAt: string;
 }
 
-const DATA_DIR = path.join(process.cwd(), "data");
-const USERS_FILE = path.join(DATA_DIR, "users.json");
-
-export async function readUsers(): Promise<StoredUser[]> {
-  try {
-    await fs.mkdir(DATA_DIR, { recursive: true });
-    const content = await fs.readFile(USERS_FILE, "utf-8");
-    return JSON.parse(content);
-  } catch {
-    return [];
-  }
+function rowToUser(r: Record<string, string>): StoredUser {
+  return { id: r.id, email: r.email, name: r.name, password: r.password, createdAt: r.created_at };
 }
 
-export async function writeUsers(users: StoredUser[]): Promise<void> {
-  await fs.mkdir(DATA_DIR, { recursive: true });
-  await fs.writeFile(USERS_FILE, JSON.stringify(users, null, 2));
+export async function findUserByEmail(email: string): Promise<StoredUser | null> {
+  await ensureSchema();
+  const rows = await sql`SELECT * FROM users WHERE email = ${email} LIMIT 1`;
+  return rows.length ? rowToUser(rows[0] as Record<string, string>) : null;
+}
+
+export async function createUser(user: StoredUser): Promise<void> {
+  await ensureSchema();
+  await sql`
+    INSERT INTO users (id, email, name, password, created_at)
+    VALUES (${user.id}, ${user.email}, ${user.name}, ${user.password}, ${user.createdAt})
+  `;
 }
